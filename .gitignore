@@ -1,0 +1,4 @@
+# 追加意図: GitHub Pages公開時にOS固有ファイルを含めない。処理日時: 2026-09-05 JST
+.DS_Store
+Thumbs.db
+
