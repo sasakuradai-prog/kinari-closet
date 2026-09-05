@@ -1,4 +1,6 @@
 # 追加意図: GitHub Pages公開時にOS固有ファイルを含めない。処理日時: 2026-09-05 JST
 .DS_Store
 Thumbs.db
+.staging/
 
+# 更新意図: Obsidian更新用の一時ステージを公開リポジトリから除外。処理日時: 2026-09-05 09:43 JST
