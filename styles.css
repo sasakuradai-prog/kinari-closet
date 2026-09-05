@@ -61,6 +61,7 @@ h2 { margin-bottom: 0; font-size: 20px; font-weight: 600; letter-spacing: -.02em
 .primary-button, .secondary-button, .text-button, .icon-button { border: 0; cursor: pointer; }
 .primary-button { padding: 13px 20px; border-radius: 11px; background: var(--sage); color: #fff; font-weight: 600; box-shadow: 0 8px 24px rgba(70, 88, 67, .17); }
 .primary-button:hover { background: var(--sage-dark); transform: translateY(-1px); }
+.primary-button:disabled { opacity: .62; cursor: wait; transform: none; }
 .primary-button.compact { padding: 10px 16px; font-size: 12px; }
 .primary-button.wide { width: 100%; }
 .primary-button.large { padding: 16px 20px; }

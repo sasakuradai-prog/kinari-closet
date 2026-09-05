@@ -1,4 +1,4 @@
-/* 更新意図: 服の保存・提案・評価学習を提供し、登録ダイアログの閉じる操作を修正。処理日時: 2026-09-04 10:00 JST */
+/* 更新意図: 服の保存・提案・評価学習を提供し、スマホ向け登録処理を安定化。処理日時: 2026-09-05 JST */
 const DB_NAME = "kinari-closet";
 const DB_VERSION = 1;
 
@@ -47,6 +47,11 @@ function storeRequest(store, mode, action, value) {
 
 const getAll = (store) => storeRequest(store, "readonly", "getAll");
 const put = (store, value) => storeRequest(store, "readwrite", "put", value);
+
+function createId() {
+  if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
+  return `${Date.now()}-${Math.random().toString(16).slice(2)}-${Math.random().toString(16).slice(2)}`;
+}
 
 function escapeHTML(value = "") {
   return String(value).replace(/[&<>'"]/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" })[char]);
@@ -98,8 +103,24 @@ function closestColor([r, g, b]) {
   function distance(sample) { return Math.sqrt((r - sample[0]) ** 2 + (g - sample[1]) ** 2 + (b - sample[2]) ** 2); }
 }
 
+async function loadPhoto(file) {
+  if ("createImageBitmap" in window) return createImageBitmap(file);
+  const url = URL.createObjectURL(file);
+  try {
+    const image = new Image();
+    image.src = url;
+    await new Promise((resolve, reject) => {
+      image.onload = resolve;
+      image.onerror = () => reject(new Error("画像を読み込めませんでした"));
+    });
+    return image;
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
 async function compressAndAnalyze(file) {
-  const bitmap = await createImageBitmap(file);
+  const bitmap = await loadPhoto(file);
   const max = 1000;
   const ratio = Math.min(1, max / Math.max(bitmap.width, bitmap.height));
   const canvas = document.createElement("canvas");
@@ -125,7 +146,7 @@ async function compressAndAnalyze(file) {
   }
   const detectedColor = closestColor([r / Math.max(1, count), g / Math.max(1, count), b / Math.max(1, count)]);
   const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", .82));
-  bitmap.close();
+  if (typeof bitmap.close === "function") bitmap.close();
   return { blob, detectedColor };
 }
 
@@ -167,23 +188,40 @@ function openItemDialog(item = null) {
 
 async function saveItem(event) {
   event.preventDefault();
-  if (!$("#item-form").reportValidity()) return;
-  const existing = items.find((item) => item.id === $("#item-id").value);
-  const now = new Date().toISOString();
-  const item = {
-    id: existing?.id || crypto.randomUUID(),
-    name: $("#item-name").value.trim(), category: $("#item-category").value, color: $("#item-color").value,
-    season: $("#item-season").value, warmth: Number($("#item-warmth").value), formality: Number($("#item-formality").value),
-    status: existing?.status === "archived" ? "archived" : $("#item-status").value,
-    notes: $("#item-notes").value.trim(), photo: currentPhoto || existing?.photo || null,
-    createdAt: existing?.createdAt || now, updatedAt: now, lastWornAt: existing?.lastWornAt || null,
-  };
-  await put("items", item);
-  items = await getAll("items");
-  $("#item-dialog").close();
-  resetItemForm();
-  renderAll();
-  showToast(existing ? "服の情報を更新しました" : "クローゼットに追加しました");
+  const form = $("#item-form");
+  if (!form.checkValidity()) {
+    form.reportValidity();
+    return;
+  }
+
+  const saveButton = $("#save-item");
+  const defaultLabel = saveButton.textContent;
+  saveButton.disabled = true;
+  saveButton.textContent = "保存しています…";
+
+  try {
+    const existing = items.find((item) => item.id === $("#item-id").value);
+    const now = new Date().toISOString();
+    const item = {
+      id: existing?.id || createId(),
+      name: $("#item-name").value.trim(), category: $("#item-category").value, color: $("#item-color").value,
+      season: $("#item-season").value, warmth: Number($("#item-warmth").value), formality: Number($("#item-formality").value),
+      status: existing?.status === "archived" ? "archived" : $("#item-status").value,
+      notes: $("#item-notes").value.trim(), photo: currentPhoto || existing?.photo || null,
+      createdAt: existing?.createdAt || now, updatedAt: now, lastWornAt: existing?.lastWornAt || null,
+    };
+    await put("items", item);
+    items = await getAll("items");
+    $("#item-dialog").close();
+    renderAll();
+    showToast(existing ? "服の情報を更新しました" : "クローゼットに追加しました");
+  } catch (error) {
+    console.error("服の保存に失敗しました", error);
+    showToast("保存できませんでした。通常モードのブラウザで、もう一度お試しください");
+  } finally {
+    saveButton.disabled = false;
+    saveButton.textContent = defaultLabel;
+  }
 }
 
 async function archiveItem(id) {
@@ -373,7 +411,7 @@ async function saveFeedback(button) {
   const row = button.closest(".feedback-row");
   const outfitData = JSON.parse($("#outfit-results").dataset.outfits || "[]").find((outfit) => outfit.id === row.dataset.outfitId);
   if (!outfitData) return;
-  const entry = { id: crypto.randomUUID(), type: button.dataset.feedback, itemIds: outfitData.itemIds, conditions: outfitData.conditions, createdAt: new Date().toISOString() };
+  const entry = { id: createId(), type: button.dataset.feedback, itemIds: outfitData.itemIds, conditions: outfitData.conditions, createdAt: new Date().toISOString() };
   await put("feedback", entry);
   feedback.push(entry);
   if (entry.type === "worn") {
@@ -435,7 +473,7 @@ function bindEvents() {
       $("#analysis-hint").textContent = "画像を読み込めませんでした。別の写真をお試しください。";
     }
   });
-  $("#save-item").addEventListener("click", saveItem);
+  $("#item-form").addEventListener("submit", saveItem);
   $("#item-dialog").addEventListener("close", resetItemForm);
   $("#condition-form").addEventListener("submit", (event) => {
     event.preventDefault();

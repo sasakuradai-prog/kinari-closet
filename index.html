@@ -18,7 +18,7 @@
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
-    <!-- 更新意図: 手持ち服MVPの画面を作成し、未入力でも登録画面を閉じられるよう修正。処理日時: 2026-09-04 10:00 JST -->
+    <!-- 更新意図: 手持ち服MVPを作成し、スマホで登録・閉じる操作が安定するよう修正。処理日時: 2026-09-05 JST -->
     <div class="app-shell">
       <aside class="sidebar" aria-label="メインナビゲーション">
         <a class="brand" href="#home" aria-label="KINARI ホーム">
@@ -218,7 +218,7 @@
     </div>
 
     <dialog class="item-dialog" id="item-dialog">
-      <form method="dialog" class="dialog-card" id="item-form">
+      <form class="dialog-card" id="item-form">
         <div class="dialog-heading">
           <div>
             <p class="eyebrow">ADD TO CLOSET</p>
@@ -276,7 +276,7 @@
 
         <div class="dialog-actions">
           <button class="secondary-button" type="button" data-close-item-dialog>キャンセル</button>
-          <button class="primary-button" id="save-item" value="default">この内容で保存</button>
+          <button class="primary-button" id="save-item" type="submit">この内容で保存</button>
         </div>
       </form>
     </dialog>
