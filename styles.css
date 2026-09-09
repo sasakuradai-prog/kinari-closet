@@ -1,4 +1,4 @@
-/* 更新意図: KINARI MVPのスマホ向け視覚設計を保ち、画像付きサンプルの識別表示を追加。処理日時: 2026-09-09 JST */
+/* 更新意図: 既存の静かなデザインを保ち、好み学習・トレンド・採点内訳を読みやすく追加。処理日時: 2026-09-10 JST */
 :root {
   --ink: #252923;
   --muted: #73766e;
@@ -112,6 +112,8 @@ select, input, textarea { color: var(--ink); }
 .card-body { padding: 15px; }
 .card-body h3 { overflow: hidden; margin: 0 0 5px; font-size: 14px; text-overflow: ellipsis; white-space: nowrap; }
 .card-meta { color: var(--muted); font-size: 10px; }
+.card-tags { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 9px; }
+.card-tags span { padding: 4px 7px; border-radius: 999px; background: #f2efe7; color: #676b63; font-size: 9px; }
 .card-actions { display: flex; justify-content: space-between; align-items: center; margin-top: 13px; }
 .card-actions button { border: 0; background: none; color: var(--sage); cursor: pointer; font-size: 10px; font-weight: 600; }
 .color-dot { width: 12px; height: 12px; display: inline-block; border: 2px solid white; border-radius: 50%; box-shadow: 0 0 0 1px var(--line); vertical-align: -2px; margin-right: 5px; }
@@ -120,6 +122,17 @@ select, input, textarea { color: var(--ink); }
 
 .stylist-layout { display: grid; grid-template-columns: minmax(330px, .78fr) minmax(420px, 1.22fr); gap: 24px; align-items: start; }
 .condition-form { padding: 28px; }
+.trend-card { margin-bottom: 16px; padding: 17px; border: 1px solid #d9d0ba; border-radius: 14px; background: linear-gradient(145deg, #f1e8d6, #f8f4eb); }
+.trend-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
+.trend-heading span { color: #775f36; font-size: 12px; font-weight: 700; letter-spacing: .08em; }
+.trend-heading small { color: var(--muted); font-size: 12px; }
+.trend-card h3 { margin: 0 0 11px; font-size: 16px; line-height: 1.5; }
+.trend-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 11px; }
+.trend-tags span { padding: 5px 8px; border-radius: 999px; background: rgba(255,255,255,.65); color: #62573f; font-size: 12px; }
+.trend-card a { color: #725f3f; font-size: 12px; font-weight: 600; }
+.learning-summary { display: grid; gap: 4px; margin-bottom: 23px; padding: 14px 15px; border-radius: 12px; background: var(--sage-soft); }
+.learning-summary strong { color: var(--sage-dark); font-size: 14px; }
+.learning-summary span { color: #626b5f; font-size: 12px; line-height: 1.6; }
 .form-section { border: 0; border-bottom: 1px solid var(--line); margin: 0 0 23px; padding: 0 0 23px; }
 .field-label { display: flex; align-items: center; gap: 9px; width: 100%; margin-bottom: 17px; }
 .field-label span { color: var(--sage); font-size: 10px; font-weight: 700; }
@@ -136,6 +149,9 @@ input[type="range"] { width: 100%; accent-color: var(--sage); }
 .choice-row input:checked + span, .choice-grid input:checked + span { background: var(--sage-soft); border-color: #a9b6a5; color: var(--sage-dark); font-weight: 600; }
 .check-line { display: flex; align-items: center; gap: 9px; margin: 0 0 22px; color: var(--muted); font-size: 10px; }
 .check-line input { accent-color: var(--sage); }
+.weight-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-top: 13px; }
+.weight-grid span { display: grid; gap: 2px; padding: 8px 5px; border-radius: 9px; background: #f6f3ec; color: var(--muted); font-size: 11px; text-align: center; }
+.weight-grid strong { color: var(--ink); font-size: 13px; }
 .results-area { min-height: 560px; }
 .empty-results { min-height: 560px; display: grid; align-content: center; justify-items: center; padding: 40px; border: 1px dashed #d4cec2; border-radius: 18px; text-align: center; color: var(--muted); }
 .empty-results .sparkle { width: 58px; height: 58px; display: grid; place-items: center; margin-bottom: 18px; background: var(--sage-soft); border-radius: 50%; color: var(--sage); font-size: 23px; }
@@ -154,8 +170,12 @@ input[type="range"] { width: 100%; accent-color: var(--sage); }
 .outfit-piece div { aspect-ratio: 1; overflow: hidden; border-radius: 10px; background: #eeeae0; }
 .outfit-piece img { width: 100%; height: 100%; object-fit: cover; }
 .outfit-piece p { overflow: hidden; margin: 5px 1px 0; font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
+.score-breakdown { display: grid; grid-template-columns: repeat(4, 1fr); gap: 7px; margin-top: 15px; }
+.score-breakdown span { display: grid; gap: 3px; padding: 9px 7px; border-radius: 9px; background: #f5f2eb; text-align: center; }
+.score-breakdown small { color: var(--muted); font-size: 11px; }
+.score-breakdown strong { color: var(--sage-dark); font-size: 15px; }
 .outfit-reason { margin: 15px 0 13px; padding: 11px 13px; border-radius: 10px; background: #f6f3ec; color: #60635d; font-size: 10px; line-height: 1.7; }
-.feedback-row { display: flex; align-items: center; gap: 8px; }
+.feedback-row { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
 .feedback-row > span { margin-right: auto; color: var(--muted); font-size: 9px; }
 .feedback-row button { padding: 6px 9px; border: 1px solid var(--line); background: white; border-radius: 8px; cursor: pointer; font-size: 9px; }
 .feedback-row button:hover, .feedback-row button.is-selected { background: var(--sage-soft); border-color: #a9b6a5; }
@@ -213,6 +233,8 @@ input[type="range"] { width: 100%; accent-color: var(--sage); }
   .field.full { grid-column: auto; }
   .dialog-card { padding: 22px 18px; }
   .outfit-items { grid-template-columns: repeat(3, 1fr); }
+  .score-breakdown { grid-template-columns: repeat(2, 1fr); }
+  .weight-grid { grid-template-columns: repeat(2, 1fr); }
   .mini-items { grid-template-columns: repeat(3, 1fr); }
   .mini-item:nth-child(4) { display: none; }
 }

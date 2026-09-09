@@ -1,0 +1,17 @@
+{
+  "updatedAt": "2026-09-10",
+  "updateIntent": "今季のトレンド要素を推薦ロジックから独立して更新できるようにする。処理日時: 2026-09-10 JST",
+  "current": {
+    "season": "2026 秋冬",
+    "title": "クラシックに、色とボリュームで変化を",
+    "updatedAt": "2026-09-10",
+    "colors": ["purple", "pink", "red", "navy", "black"],
+    "patterns": ["solid", "check", "floral"],
+    "materials": ["knit", "wool", "leather"],
+    "silhouettes": ["wide", "relaxed", "short", "long"],
+    "styles": ["classic", "trendy"],
+    "tags": ["強い色", "大胆なボリューム", "クラシックの更新", "質感のコントラスト"],
+    "sourceLabel": "Vogue Fall 2026 trend report",
+    "sourceUrl": "https://www.vogue.com/article/fall-winter-2026-fashion-trends"
+  }
+}

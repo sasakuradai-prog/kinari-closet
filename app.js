@@ -1,4 +1,4 @@
-/* 更新意図: 服の保存・提案・評価学習に加え、各カテゴリ5点の画像付きサンプルを非破壊で初期投入。処理日時: 2026-09-09 JST */
+/* 更新意図: 実用ルール・好み学習・服同士の相性・季節トレンドを統合したハイブリッド推薦へ拡張。処理日時: 2026-09-10 JST */
 const DB_NAME = "kinari-closet";
 const DB_VERSION = 1;
 
@@ -9,9 +9,27 @@ const labels = {
   status: { ready: "着用可能", laundry: "洗濯中", cleaning: "クリーニング", archived: "アーカイブ" },
   occasion: { daily: "普段のお出かけ", work: "仕事・打ち合わせ", active: "よく歩く日", special: "食事・特別な予定" },
   mood: { relaxed: "リラックス", clean: "きちんと", minimal: "シンプル", adventure: "少し冒険" },
+  pattern: { solid: "無地", stripe: "ストライプ", check: "チェック", floral: "花柄", graphic: "柄・グラフィック", other: "その他" },
+  material: { cotton: "コットン", knit: "ニット", denim: "デニム", linen: "リネン", wool: "ウール", leather: "レザー", synthetic: "化繊", other: "その他" },
+  silhouette: { slim: "細身", regular: "標準", relaxed: "ゆったり", wide: "ワイド", short: "短丈", long: "ロング" },
+  style: { casual: "カジュアル", clean: "きれいめ", minimal: "ミニマル", classic: "クラシック", natural: "ナチュラル", sporty: "スポーティ", trendy: "トレンド" },
 };
 
 const colorHex = { white: "#f6f5ef", black: "#282a28", gray: "#92958f", navy: "#263b55", blue: "#6585a3", beige: "#c8b797", brown: "#765846", green: "#647a61", red: "#a8534e", yellow: "#d3b34c", pink: "#c58f99", purple: "#7b6886", multi: "linear-gradient(90deg,#b38b67,#6e8290,#8a6b77)" };
+
+const DEFAULT_TREND_PROFILE = {
+  season: "2026 秋冬",
+  title: "クラシックに、色とボリュームで変化を",
+  updatedAt: "2026-09-10",
+  colors: ["purple", "pink", "red", "navy", "black"],
+  patterns: ["solid", "check", "floral"],
+  materials: ["knit", "wool", "leather"],
+  silhouettes: ["wide", "relaxed", "short", "long"],
+  styles: ["classic", "trendy"],
+  tags: ["強い色", "大胆なボリューム", "クラシックの更新", "質感のコントラスト"],
+  sourceLabel: "Vogue Fall 2026 trend report",
+  sourceUrl: "https://www.vogue.com/article/fall-winter-2026-fashion-trends",
+};
 
 const SAMPLE_ITEMS = [
   { id: "sample-tops-01", name: "白のオックスフォードシャツ", category: "tops", color: "white", season: "all", warmth: 2, formality: 4, photo: "assets/samples/tops-01.jpg" },
@@ -49,6 +67,7 @@ const SAMPLE_ITEMS = [
 let db;
 let items = [];
 let feedback = [];
+let trendProfile = DEFAULT_TREND_PROFILE;
 let currentPhoto = null;
 let currentPhotoUrl = null;
 let toastTimer;
@@ -101,6 +120,18 @@ async function ensureSampleItems() {
   }
 }
 
+async function loadTrendProfile() {
+  try {
+    const response = await fetch("./trends.json", { cache: "no-store" });
+    if (!response.ok) throw new Error(`Trend profile: ${response.status}`);
+    const data = await response.json();
+    trendProfile = { ...DEFAULT_TREND_PROFILE, ...(data.current || data) };
+  } catch (error) {
+    console.info("同梱トレンド設定を使用します", error);
+    trendProfile = DEFAULT_TREND_PROFILE;
+  }
+}
+
 function createId() {
   if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
   return `${Date.now()}-${Math.random().toString(16).slice(2)}-${Math.random().toString(16).slice(2)}`;
@@ -112,6 +143,55 @@ function escapeHTML(value = "") {
 
 function formatDate(date) {
   return new Intl.DateTimeFormat("ja-JP", { month: "long", day: "numeric", weekday: "long" }).format(date);
+}
+
+function clamp(value, min = 0, max = 100) {
+  return Math.max(min, Math.min(max, value));
+}
+
+function getItemProfile(item) {
+  const text = `${item.name || ""} ${item.notes || ""}`.toLowerCase();
+  const inferredPattern = /ストライプ|stripe/.test(text) ? "stripe"
+    : /チェック|check/.test(text) ? "check"
+      : /花柄|floral/.test(text) ? "floral"
+        : /柄|graphic|プリント/.test(text) ? "graphic" : "solid";
+  const inferredMaterial = /ニット|スウェット|knit/.test(text) ? "knit"
+    : /デニム|denim/.test(text) ? "denim"
+      : /リネン|linen/.test(text) ? "linen"
+        : /ウール|マフラー|wool/.test(text) ? "wool"
+          : /レザー|ブーツ|ローファー|ベルト|leather/.test(text) ? "leather"
+            : ["tops", "bottoms", "onepiece"].includes(item.category) ? "cotton" : "synthetic";
+  const inferredSilhouette = /ワイド|wide/.test(text) ? "wide"
+    : /スウェット|フィールド|ゆったり|relaxed/.test(text) ? "relaxed"
+      : /短丈|cropped/.test(text) ? "short"
+        : /ワンピース|コート|ロング|long/.test(text) ? "long"
+          : /細身|テーパード|slim/.test(text) ? "slim" : "regular";
+  const inferredStyle = /ランニング|スニーカー|キャップ|sport/.test(text) ? "sporty"
+    : /ワイド|テラコッタ|trend/.test(text) ? "trendy"
+      : Number(item.formality) >= 4 ? "classic"
+        : /リネン|セージ|オリーブ|natural/.test(text) ? "natural"
+          : Number(item.formality) === 3 ? "clean"
+            : ["black", "white", "gray", "navy", "beige"].includes(item.color) ? "minimal" : "casual";
+  const inferredStatement = ["red", "yellow", "pink", "purple", "multi"].includes(item.color) || inferredPattern !== "solid" || ["wide", "short"].includes(inferredSilhouette) ? 4 : 2;
+
+  return {
+    pattern: item.pattern || inferredPattern,
+    material: item.material || inferredMaterial,
+    silhouette: item.silhouette || inferredSilhouette,
+    style: item.style || inferredStyle,
+    statement: Number(item.statement || inferredStatement),
+  };
+}
+
+function profileKeys(item) {
+  const profile = getItemProfile(item);
+  return [
+    `color:${item.color}`,
+    `pattern:${profile.pattern}`,
+    `material:${profile.material}`,
+    `silhouette:${profile.silhouette}`,
+    `style:${profile.style}`,
+  ];
 }
 
 function objectURL(photo) {
@@ -223,6 +303,7 @@ function resetItemForm() {
 function openItemDialog(item = null) {
   resetItemForm();
   if (item) {
+    const profile = getItemProfile(item);
     $("#item-dialog-title").textContent = "服の情報を編集";
     $("#item-id").value = item.id;
     $("#item-name").value = item.name;
@@ -231,6 +312,11 @@ function openItemDialog(item = null) {
     $("#item-season").value = item.season;
     $("#item-warmth").value = item.warmth;
     $("#item-formality").value = item.formality;
+    $("#item-pattern").value = profile.pattern;
+    $("#item-material").value = profile.material;
+    $("#item-silhouette").value = profile.silhouette;
+    $("#item-style").value = profile.style;
+    $("#item-statement").value = profile.statement;
     $("#item-status").value = item.status === "archived" ? "ready" : item.status;
     $("#item-notes").value = item.notes || "";
     currentPhoto = item.photo || null;
@@ -264,6 +350,8 @@ async function saveItem(event) {
       id: existing?.id || createId(),
       name: $("#item-name").value.trim(), category: $("#item-category").value, color: $("#item-color").value,
       season: $("#item-season").value, warmth: Number($("#item-warmth").value), formality: Number($("#item-formality").value),
+      pattern: $("#item-pattern").value, material: $("#item-material").value, silhouette: $("#item-silhouette").value,
+      style: $("#item-style").value, statement: Number($("#item-statement").value),
       status: existing?.status === "archived" ? "archived" : $("#item-status").value,
       notes: $("#item-notes").value.trim(), photo: currentPhoto || existing?.photo || null,
       createdAt: existing?.createdAt || now, updatedAt: now, lastWornAt: existing?.lastWornAt || null,
@@ -328,22 +416,27 @@ function renderCloset() {
   const category = $("#category-filter").value;
   const status = $("#status-filter").value;
   const filtered = items.filter((item) => {
-    const text = `${item.name} ${labels.color[item.color]} ${item.notes || ""}`.toLowerCase();
+    const profile = getItemProfile(item);
+    const text = `${item.name} ${labels.color[item.color]} ${labels.pattern[profile.pattern]} ${labels.material[profile.material]} ${labels.silhouette[profile.silhouette]} ${labels.style[profile.style]} ${item.notes || ""}`.toLowerCase();
     return (!search || text.includes(search)) && (category === "all" || item.category === category) && (status === "all" || item.status === status);
   }).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 
-  $("#closet-grid").innerHTML = filtered.length ? filtered.map((item) => `
+  $("#closet-grid").innerHTML = filtered.length ? filtered.map((item) => {
+    const profile = getItemProfile(item);
+    return `
     <article class="closet-card">
       <div class="card-image">${itemPhotoMarkup(item)}<span class="status-pill">${labels.status[item.status]}</span>${item.isSample ? `<span class="sample-pill">サンプル</span>` : ""}</div>
       <div class="card-body">
         <h3>${escapeHTML(item.name)}</h3>
         <p class="card-meta"><span class="color-dot" style="background:${colorHex[item.color]}"></span>${labels.color[item.color]} ・ ${labels.category[item.category]} ・ ${labels.season[item.season]}</p>
+        <div class="card-tags"><span>${labels.style[profile.style]}</span><span>${labels.silhouette[profile.silhouette]}</span><span>${labels.pattern[profile.pattern]}</span></div>
         <div class="card-actions">
           <button data-edit-item="${item.id}">情報を編集</button>
           ${item.status !== "archived" ? `<button data-archive-item="${item.id}">アーカイブ</button>` : `<button data-restore-item="${item.id}">元に戻す</button>`}
         </div>
       </div>
-    </article>`).join("") : `<div class="empty-state"><strong>該当する服がありません</strong><span>条件を変えるか、新しい服を登録してください。</span></div>`;
+    </article>`;
+  }).join("") : `<div class="empty-state"><strong>該当する服がありません</strong><span>条件を変えるか、新しい服を登録してください。</span></div>`;
 }
 
 function desiredWarmth(temp) {
@@ -365,20 +458,113 @@ function seasonForTemperature(temp) {
   return "summer";
 }
 
-function colorCompatibility(colors, mood) {
-  const neutrals = new Set(["white", "black", "gray", "navy", "beige", "brown"]);
-  const unique = [...new Set(colors)];
-  const accents = unique.filter((color) => !neutrals.has(color));
-  let score = 20;
-  if (unique.length <= 3) score += 8;
-  if (accents.length <= 1) score += 6;
-  if (mood === "adventure" && accents.length >= 1) score += 6;
-  if (mood === "minimal" && unique.every((color) => neutrals.has(color))) score += 7;
-  return score;
-}
-
 function combinations(groups) {
   return groups.reduce((acc, group) => acc.flatMap((set) => group.map((item) => [...set, item])), [[]]);
+}
+
+function decisionWeights(preferenceBalance = 67) {
+  const preference = 15 + Math.round(clamp(preferenceBalance) * .3);
+  return { practical: 40, preference, harmony: 15, trend: 45 - preference };
+}
+
+function practicalScore(set, conditions) {
+  const wearable = set.filter((item) => item.category !== "accessory");
+  const wantedWarmth = desiredWarmth(conditions.temperature);
+  const wantedFormality = targetFormality(conditions.occasion);
+  const wantedSeason = seasonForTemperature(conditions.temperature);
+  const recentLimit = Date.now() - 7 * 86400000;
+  const avgWarmth = wearable.reduce((sum, item) => sum + Number(item.warmth), 0) / Math.max(1, wearable.length);
+  const avgFormality = wearable.reduce((sum, item) => sum + Number(item.formality), 0) / Math.max(1, wearable.length);
+  let score = 100;
+  score -= Math.abs(avgWarmth - wantedWarmth) * 14;
+  score -= Math.abs(avgFormality - wantedFormality) * 12;
+  score -= wearable.filter((item) => item.season !== "all" && item.season !== wantedSeason).length * 10;
+  if (conditions.weather === "rain" && set.some((item) => /撥水|防水/.test(item.notes || ""))) score += 8;
+  if (conditions.weather === "rain" && set.some((item) => /雨.{0,4}(避け|苦手)|濡れ/.test(item.notes || ""))) score -= 18;
+  if (conditions.occasion === "active" && set.some((item) => item.category === "shoes" && Number(item.formality) <= 2)) score += 8;
+  if (conditions.avoidRecent && set.some((item) => item.lastWornAt && new Date(item.lastWornAt).getTime() > recentLimit)) score -= 18;
+  return Math.round(clamp(score));
+}
+
+function harmonyScore(set, conditions) {
+  const neutrals = new Set(["white", "black", "gray", "navy", "beige", "brown"]);
+  const uniqueColors = [...new Set(set.map((item) => item.color))];
+  const accents = uniqueColors.filter((color) => !neutrals.has(color));
+  const profiles = set.map(getItemProfile);
+  const patterned = profiles.filter((profile) => profile.pattern !== "solid").length;
+  const styles = new Set(profiles.map((profile) => profile.style));
+  const targetStyles = {
+    relaxed: new Set(["casual", "natural", "sporty"]),
+    clean: new Set(["clean", "classic", "minimal"]),
+    minimal: new Set(["minimal", "clean", "classic"]),
+    adventure: new Set(["trendy", "casual"]),
+  }[conditions.mood];
+  let score = 55;
+  score += uniqueColors.length <= 3 ? 12 : -12;
+  score += accents.length <= 1 ? 8 : -8;
+  score += patterned <= 1 ? 8 : -12;
+  score += styles.size <= 2 ? 7 : -5;
+  score += profiles.some((profile) => targetStyles.has(profile.style)) ? 10 : 0;
+  if (conditions.mood === "minimal" && uniqueColors.every((color) => neutrals.has(color))) score += 8;
+  if (conditions.mood === "adventure" && profiles.some((profile) => profile.statement >= 4)) score += 8;
+
+  const top = set.find((item) => item.category === "tops");
+  const bottom = set.find((item) => item.category === "bottoms");
+  if (top && bottom) {
+    const topShape = getItemProfile(top).silhouette;
+    const bottomShape = getItemProfile(bottom).silhouette;
+    if (["regular", "slim", "short"].includes(topShape) && bottomShape === "wide") score += 7;
+    if (["relaxed", "wide"].includes(topShape) && ["regular", "slim"].includes(bottomShape)) score += 7;
+    if (["relaxed", "wide"].includes(topShape) && bottomShape === "wide") score -= 5;
+  }
+  return Math.round(clamp(score));
+}
+
+function buildPreferenceModel() {
+  const itemWeights = new Map();
+  const featureWeights = new Map();
+  const effects = { like: { item: 4, feature: 2 }, worn: { item: 5, feature: 1.5 }, dislike: { item: -7, feature: -2.5 } };
+
+  feedback.forEach((entry) => {
+    const effect = effects[entry.type];
+    if (!effect) return;
+    (entry.itemIds || []).forEach((id) => {
+      itemWeights.set(id, (itemWeights.get(id) || 0) + effect.item);
+      const item = items.find((candidate) => candidate.id === id);
+      if (!item) return;
+      profileKeys(item).forEach((key) => featureWeights.set(key, (featureWeights.get(key) || 0) + effect.feature));
+    });
+  });
+  return { itemWeights, featureWeights };
+}
+
+function preferenceScore(set, model) {
+  if (!feedback.length) return 50;
+  const learnedValue = set.reduce((sum, item) => {
+    const direct = model.itemWeights.get(item.id) || 0;
+    const features = profileKeys(item).reduce((featureSum, key) => featureSum + (model.featureWeights.get(key) || 0), 0);
+    return sum + direct + features;
+  }, 0) / Math.max(1, set.length);
+  return Math.round(clamp(50 + learnedValue * 1.25));
+}
+
+function trendScore(set) {
+  const profiles = set.map(getItemProfile);
+  const matches = set.reduce((sum, item, index) => {
+    const profile = profiles[index];
+    return sum
+      + (trendProfile.colors.includes(item.color) ? 1 : 0)
+      + (trendProfile.patterns.includes(profile.pattern) ? 1 : 0)
+      + (trendProfile.materials.includes(profile.material) ? 1 : 0)
+      + (trendProfile.silhouettes.includes(profile.silhouette) ? 1 : 0)
+      + (trendProfile.styles.includes(profile.style) ? 1 : 0);
+  }, 0);
+  const possible = Math.max(1, set.length * 5);
+  let score = 35 + (matches / possible) * 55;
+  const hasClassic = profiles.some((profile) => ["classic", "minimal", "clean"].includes(profile.style));
+  const hasExpression = profiles.some((profile) => profile.style === "trendy" || profile.statement >= 4);
+  if (hasClassic && hasExpression) score += 10;
+  return Math.round(clamp(score));
 }
 
 function generateCandidates(conditions) {
@@ -387,38 +573,34 @@ function generateCandidates(conditions) {
   const bases = [];
   if (group("tops").length && group("bottoms").length) bases.push(...combinations([group("tops"), group("bottoms")]));
   if (group("onepiece").length) bases.push(...group("onepiece").map((item) => [item]));
-  const optional = (base, category, shouldInclude) => {
+  const optional = (base, category, shouldInclude, includeNone = false) => {
     const choices = group(category);
     if (!choices.length || !shouldInclude) return [base];
-    return choices.map((item) => [...base, item]);
+    const withItems = choices.map((item) => [...base, item]);
+    return includeNone ? [base, ...withItems] : withItems;
   };
-  let candidates = [];
+  const candidates = [];
   for (const base of bases) {
     const withOuter = optional(base, "outer", conditions.temperature < 19 || conditions.weather === "rain");
-    for (const set of withOuter) candidates.push(...optional(set, "shoes", true));
+    for (const set of withOuter) {
+      const withShoes = optional(set, "shoes", true);
+      for (const dressed of withShoes) candidates.push(...optional(dressed, "accessory", true, true));
+    }
   }
   if (!candidates.length) return [];
 
-  const preference = new Map();
-  feedback.forEach((entry) => entry.itemIds.forEach((id) => preference.set(id, (preference.get(id) || 0) + ({ like: 3, worn: 5, dislike: -5 }[entry.type] || 0))));
-  const wantedWarmth = desiredWarmth(conditions.temperature);
-  const wantedFormality = targetFormality(conditions.occasion);
-  const wantedSeason = seasonForTemperature(conditions.temperature);
-  const recentLimit = Date.now() - 7 * 86400000;
+  const model = buildPreferenceModel();
+  const weights = decisionWeights(conditions.preferenceBalance);
 
   return candidates.map((set) => {
-    const avgWarmth = set.reduce((sum, item) => sum + item.warmth, 0) / set.length;
-    const avgFormality = set.reduce((sum, item) => sum + item.formality, 0) / set.length;
-    let score = 48 + colorCompatibility(set.map((item) => item.color), conditions.mood);
-    score -= Math.abs(avgWarmth - wantedWarmth) * 7;
-    score -= Math.abs(avgFormality - wantedFormality) * 6;
-    score -= set.filter((item) => item.season !== "all" && item.season !== wantedSeason).length * 7;
-    score += set.reduce((sum, item) => sum + (preference.get(item.id) || 0), 0);
-    if (conditions.weather === "rain" && set.some((item) => /撥水|防水/.test(item.notes))) score += 7;
-    if (conditions.weather === "rain" && set.some((item) => /雨.{0,4}(避け|苦手)|濡れ/.test(item.notes))) score -= 12;
-    if (conditions.occasion === "active" && set.some((item) => item.category === "shoes" && item.formality <= 2)) score += 5;
-    if (conditions.avoidRecent && set.some((item) => item.lastWornAt && new Date(item.lastWornAt).getTime() > recentLimit)) score -= 12;
-    return { id: set.map((item) => item.id).join("-"), items: set, score: Math.max(40, Math.min(98, Math.round(score))), conditions };
+    const components = {
+      practical: practicalScore(set, conditions),
+      preference: preferenceScore(set, model),
+      harmony: harmonyScore(set, conditions),
+      trend: trendScore(set),
+    };
+    const score = Object.entries(weights).reduce((sum, [key, weight]) => sum + components[key] * weight / 100, 0);
+    return { id: set.map((item) => item.id).join("-"), items: set, score: Math.round(clamp(score, 40, 98)), components, weights, conditions };
   }).sort((a, b) => b.score - a.score);
 }
 
@@ -438,11 +620,16 @@ function selectDiverse(candidates) {
 }
 
 function outfitReason(outfit, index) {
-  const { conditions, items: set } = outfit;
+  const { conditions, items: set, components } = outfit;
   const names = set.map((item) => item.name);
-  const lead = ["条件とのバランスが最も良い定番案です。", "雰囲気を少し変えた、使いやすい別案です。", "いつもより少し変化をつける提案です。"][index];
-  const tempText = conditions.temperature >= 27 ? "涼しさ" : conditions.temperature <= 14 ? "暖かさ" : "温度調整のしやすさ";
-  return `${lead} ${names.slice(0, 2).join("と")}を軸に、${tempText}と「${labels.occasion[conditions.occasion]}」の場面を両立させました。`;
+  const strongest = Object.entries(components).sort((a, b) => b[1] - a[1]).slice(0, 2).map(([key]) => ({
+    practical: "気温・予定への実用性",
+    preference: feedback.length ? "これまでの好み" : "これから学習する好み",
+    harmony: "色・柄・シルエットのまとまり",
+    trend: `${trendProfile.season}の要素`,
+  }[key]));
+  const lead = ["総合バランスが最も高い案です。", "同じ条件で雰囲気を変えた案です。", "少し新鮮さを足した案です。"][index];
+  return `${lead} ${names.slice(0, 2).join("と")}を軸に、${strongest.join("と")}を評価しました。`;
 }
 
 function renderOutfits(outfits, conditions) {
@@ -454,13 +641,19 @@ function renderOutfits(outfits, conditions) {
     return;
   }
   results.innerHTML = `
-    <div class="result-header"><div><p class="eyebrow">${conditions.temperature}℃・${labels.occasion[conditions.occasion]}</p><h2>今日の${outfits.length}つの提案</h2></div><span class="soft-badge">手持ち服のみ</span></div>
+    <div class="result-header"><div><p class="eyebrow">${conditions.temperature}℃・${labels.occasion[conditions.occasion]}</p><h2>今日の${outfits.length}つの提案</h2></div><span class="soft-badge">ハイブリッド判定</span></div>
     <div class="outfit-list">${outfits.map((outfit, index) => `
       <article class="outfit-card">
         <div class="outfit-top"><div><span class="outfit-number">LOOK 0${index + 1}</span><h3>${["いちばんおすすめ", "安心の別案", "少し気分を変える"][index]}</h3></div><span class="score-ring">${outfit.score}</span></div>
         <div class="outfit-items">${outfit.items.map((item) => `<div class="outfit-piece"><div>${itemPhotoMarkup(item)}</div><p>${escapeHTML(item.name)}</p></div>`).join("")}</div>
+        <div class="score-breakdown" aria-label="評価の内訳">
+          <span><small>実用性</small><strong>${outfit.components.practical}</strong></span>
+          <span><small>あなたの好み</small><strong>${outfit.components.preference}</strong></span>
+          <span><small>服同士の相性</small><strong>${outfit.components.harmony}</strong></span>
+          <span><small>今季らしさ</small><strong>${outfit.components.trend}</strong></span>
+        </div>
         <p class="outfit-reason">${escapeHTML(outfitReason(outfit, index))}</p>
-        <div class="feedback-row" data-outfit-id="${outfit.id}"><span>この提案はどうですか？</span><button data-feedback="like">♡ 好き</button><button data-feedback="dislike">合わない</button><button data-feedback="worn">着た</button></div>
+        <div class="feedback-row" data-outfit-id="${outfit.id}"><span>評価するほど、色・柄・形の好みを学習します</span><button data-feedback="like">♡ 好き</button><button data-feedback="dislike">合わない</button><button data-feedback="worn">着た</button></div>
       </article>`).join("")}</div>`;
   results.dataset.outfits = JSON.stringify(outfits.map((outfit) => ({ id: outfit.id, itemIds: outfit.items.map((item) => item.id), conditions })));
 }
@@ -480,12 +673,53 @@ async function saveFeedback(button) {
   }
   $$('button', row).forEach((node) => node.classList.toggle("is-selected", node === button));
   renderStats();
+  renderLearningSummary();
   showToast(entry.type === "worn" ? "着用履歴に記録しました" : "好みとして学習しました");
+}
+
+function featureLabel(key) {
+  const [kind, value] = key.split(":");
+  return labels[kind]?.[value] || labels.color[value] || value;
+}
+
+function renderLearningSummary() {
+  const summary = $("#learning-summary");
+  if (!summary) return;
+  if (!feedback.length) {
+    summary.innerHTML = `<strong>好みはまだ学習前です</strong><span>提案に「好き・合わない・着た」を付けると、次回から色・柄・形へ反映します。</span>`;
+    return;
+  }
+  const model = buildPreferenceModel();
+  const favorites = [...model.featureWeights.entries()].filter(([, value]) => value > 0).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([key]) => featureLabel(key));
+  summary.innerHTML = `<strong>${feedback.length}回の評価を学習中</strong><span>${favorites.length ? `今の好み傾向：${favorites.map(escapeHTML).join("・")}` : "評価が増えると好みの傾向を表示します。"}</span>`;
+}
+
+function renderTrendCard() {
+  $("#trend-season").textContent = trendProfile.season;
+  $("#trend-title").textContent = trendProfile.title;
+  $("#trend-tags").innerHTML = trendProfile.tags.map((tag) => `<span>${escapeHTML(tag)}</span>`).join("");
+  $("#trend-updated").textContent = `更新 ${trendProfile.updatedAt}`;
+  const source = $("#trend-source");
+  source.textContent = trendProfile.sourceLabel;
+  if (/^https:\/\//.test(trendProfile.sourceUrl || "")) source.href = trendProfile.sourceUrl;
+}
+
+function updateWeightOutput() {
+  const balance = Number($("#preference-balance").value);
+  const weights = decisionWeights(balance);
+  $("#balance-output").value = `好み ${weights.preference}% / 流行 ${weights.trend}%`;
+  $("#weight-practical").textContent = `${weights.practical}%`;
+  $("#weight-preference").textContent = `${weights.preference}%`;
+  $("#weight-harmony").textContent = `${weights.harmony}%`;
+  $("#weight-trend").textContent = `${weights.trend}%`;
 }
 
 function renderAll() {
   renderStats();
   renderCloset();
+  renderLearningSummary();
+  renderTrendCard();
+  updateWeightOutput();
 }
 
 function bindEvents() {
@@ -510,6 +744,7 @@ function bindEvents() {
   $("#category-filter").addEventListener("change", renderCloset);
   $("#status-filter").addEventListener("change", renderCloset);
   $("#temperature").addEventListener("input", (event) => $("#temperature-output").value = `${event.target.value}℃`);
+  $("#preference-balance").addEventListener("input", updateWeightOutput);
   $("#item-photo").addEventListener("change", async (event) => {
     const file = event.target.files[0];
     if (!file) return;
@@ -525,7 +760,18 @@ function bindEvents() {
       $("#item-color").value = detectedColor;
       $("#item-category").value = categoryFromName(file.name);
       if (!$("#item-name").value) $("#item-name").value = file.name.replace(/\.[^.]+$/, "").replace(/[_-]+/g, " ");
-      $("#analysis-hint").textContent = `仮判定：${labels.color[detectedColor]}・${labels.category[$("#item-category").value]}。違う場合は修正してください。`;
+      const inferred = getItemProfile({
+        name: $("#item-name").value,
+        category: $("#item-category").value,
+        color: detectedColor,
+        formality: Number($("#item-formality").value),
+      });
+      $("#item-pattern").value = inferred.pattern;
+      $("#item-material").value = inferred.material;
+      $("#item-silhouette").value = inferred.silhouette;
+      $("#item-style").value = inferred.style;
+      $("#item-statement").value = inferred.statement;
+      $("#analysis-hint").textContent = `仮判定：${labels.color[detectedColor]}・${labels.category[$("#item-category").value]}・${labels.style[inferred.style]}。違う場合は修正してください。`;
     } catch (error) {
       console.error(error);
       $("#analysis-hint").textContent = "画像を読み込めませんでした。別の写真をお試しください。";
@@ -536,7 +782,10 @@ function bindEvents() {
   $("#condition-form").addEventListener("submit", (event) => {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
-    const conditions = { temperature: Number($("#temperature").value), weather: form.get("weather"), occasion: form.get("occasion"), mood: form.get("mood"), avoidRecent: $("#avoid-recent").checked };
+    const conditions = {
+      temperature: Number($("#temperature").value), weather: form.get("weather"), occasion: form.get("occasion"), mood: form.get("mood"),
+      avoidRecent: $("#avoid-recent").checked, preferenceBalance: Number($("#preference-balance").value),
+    };
     $("#quick-temperature").textContent = `${conditions.temperature}℃`;
     $("#quick-occasion").textContent = labels.occasion[conditions.occasion];
     $("#quick-mood").textContent = labels.mood[conditions.mood];
@@ -549,6 +798,7 @@ async function init() {
   try {
     db = await openDB();
     await ensureSampleItems();
+    await loadTrendProfile();
     [items, feedback] = await Promise.all([getAll("items"), getAll("feedback")]);
     bindEvents();
     renderAll();

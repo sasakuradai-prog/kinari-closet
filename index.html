@@ -15,10 +15,10 @@
       href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Noto+Sans+JP:wght@400;500;600;700&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="styles.css?v=3" />
+    <link rel="stylesheet" href="styles.css?v=4" />
   </head>
   <body>
-    <!-- 更新意図: 手持ち服MVPに各カテゴリ5点の画像付きサンプルを追加。処理日時: 2026-09-09 JST -->
+    <!-- 更新意図: 実用ルール・好み学習・服同士の相性・季節トレンドを統合した推薦画面へ拡張。処理日時: 2026-09-10 JST -->
     <div class="app-shell">
       <aside class="sidebar" aria-label="メインナビゲーション">
         <a class="brand" href="#home" aria-label="KINARI ホーム">
@@ -119,7 +119,7 @@
             <div>
               <p class="eyebrow">MY WARDROBE</p>
               <h1 id="closet-title">クローゼット</h1>
-              <p>AIの仮入力は、あなたの感覚に合わせていつでも直せます。</p>
+              <p>画像解析の仮入力は、あなたの感覚に合わせていつでも直せます。</p>
             </div>
             <button class="primary-button" data-open-item-form>＋ 新しい服</button>
           </div>
@@ -161,6 +161,18 @@
 
           <div class="stylist-layout">
             <form class="panel condition-form" id="condition-form">
+              <aside class="trend-card" aria-labelledby="trend-title">
+                <div class="trend-heading"><span id="trend-season">今季</span><small id="trend-updated"></small></div>
+                <h3 id="trend-title">今季のトレンドを読み込んでいます</h3>
+                <div class="trend-tags" id="trend-tags"></div>
+                <a id="trend-source" href="#" target="_blank" rel="noreferrer">トレンドの根拠を見る</a>
+              </aside>
+
+              <div class="learning-summary" id="learning-summary">
+                <strong>好みはまだ学習前です</strong>
+                <span>提案を評価すると、次回から色・柄・形へ反映します。</span>
+              </div>
+
               <div class="form-section">
                 <div class="field-label"><span>01</span><strong>気温</strong><output id="temperature-output">22℃</output></div>
                 <input id="temperature" type="range" min="0" max="38" value="22" />
@@ -195,6 +207,18 @@
                   <label><input type="radio" name="mood" value="adventure" /><span>少し冒険</span></label>
                 </div>
               </fieldset>
+
+              <div class="form-section">
+                <div class="field-label"><span>05</span><strong>おすすめの軸</strong><output id="balance-output">好み 35% / 流行 10%</output></div>
+                <input id="preference-balance" type="range" min="0" max="100" value="67" />
+                <div class="range-labels"><span>流行を試す</span><span>自分らしさ優先</span></div>
+                <div class="weight-grid" aria-label="判定の配点">
+                  <span>実用性 <strong id="weight-practical">40%</strong></span>
+                  <span>好み <strong id="weight-preference">35%</strong></span>
+                  <span>相性 <strong id="weight-harmony">15%</strong></span>
+                  <span>流行 <strong id="weight-trend">10%</strong></span>
+                </div>
+              </div>
 
               <label class="check-line">
                 <input id="avoid-recent" type="checkbox" checked />
@@ -267,6 +291,28 @@
               <option value="1">1 — ラフ</option><option value="2">2 — カジュアル</option><option value="3" selected>3 — きれいめ</option>
               <option value="4">4 — ビジネス</option><option value="5">5 — フォーマル</option>
             </select></label>
+            <label class="field"><span>柄</span><select id="item-pattern">
+              <option value="solid">無地</option><option value="stripe">ストライプ</option><option value="check">チェック</option>
+              <option value="floral">花柄</option><option value="graphic">柄・グラフィック</option><option value="other">その他</option>
+            </select></label>
+            <label class="field"><span>素材</span><select id="item-material">
+              <option value="cotton">コットン</option><option value="knit">ニット</option><option value="denim">デニム</option>
+              <option value="linen">リネン</option><option value="wool">ウール</option><option value="leather">レザー</option>
+              <option value="synthetic">化繊</option><option value="other">その他</option>
+            </select></label>
+            <label class="field"><span>シルエット</span><select id="item-silhouette">
+              <option value="slim">細身</option><option value="regular" selected>標準</option><option value="relaxed">ゆったり</option>
+              <option value="wide">ワイド</option><option value="short">短丈</option><option value="long">ロング</option>
+            </select></label>
+            <label class="field"><span>テイスト</span><select id="item-style">
+              <option value="casual">カジュアル</option><option value="clean" selected>きれいめ</option><option value="minimal">ミニマル</option>
+              <option value="classic">クラシック</option><option value="natural">ナチュラル</option><option value="sporty">スポーティ</option>
+              <option value="trendy">トレンド</option>
+            </select></label>
+            <label class="field"><span>存在感</span><select id="item-statement">
+              <option value="1">1 — 控えめ</option><option value="2" selected>2 — なじみやすい</option><option value="3">3 — 程よい</option>
+              <option value="4">4 — アクセント</option><option value="5">5 — 主役</option>
+            </select></label>
             <label class="field"><span>状態</span><select id="item-status">
               <option value="ready">着用可能</option><option value="laundry">洗濯中</option><option value="cleaning">クリーニング</option>
             </select></label>
@@ -282,6 +328,6 @@
     </dialog>
 
     <div class="toast" id="toast" role="status"></div>
-    <script src="app.js?v=3"></script>
+    <script src="app.js?v=4"></script>
   </body>
 </html>
