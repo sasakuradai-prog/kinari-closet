@@ -15,7 +15,7 @@
       href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Noto+Sans+JP:wght@400;500;600;700&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="styles.css?v=4" />
+    <link rel="stylesheet" href="styles.css?v=5" />
   </head>
   <body>
     <!-- 更新意図: 実用ルール・好み学習・服同士の相性・季節トレンドを統合した推薦画面へ拡張。処理日時: 2026-09-10 JST -->
@@ -121,7 +121,10 @@
               <h1 id="closet-title">クローゼット</h1>
               <p>画像解析の仮入力は、あなたの感覚に合わせていつでも直せます。</p>
             </div>
-            <button class="primary-button" data-open-item-form>＋ 新しい服</button>
+            <div class="page-heading-actions">
+              <button class="secondary-button" data-restore-samples>サンプル30点を復元</button>
+              <button class="primary-button" data-open-item-form>＋ 新しい服</button>
+            </div>
           </div>
 
           <div class="filter-bar">
@@ -328,6 +331,6 @@
     </dialog>
 
     <div class="toast" id="toast" role="status"></div>
-    <script src="app.js?v=4"></script>
+    <script src="app.js?v=5"></script>
   </body>
 </html>

@@ -1,4 +1,4 @@
-/* 更新意図: 実用ルール・好み学習・服同士の相性・季節トレンドを統合したハイブリッド推薦へ拡張。処理日時: 2026-09-10 JST */
+/* 更新意図: 実用ルール・好み学習・服同士の相性・季節トレンドを統合し、サンプル服を非破壊で再投入できるようにする。処理日時: 2026-09-10 JST */
 const DB_NAME = "kinari-closet";
 const DB_VERSION = 1;
 
@@ -118,6 +118,45 @@ async function ensureSampleItems() {
       lastWornAt: null,
     });
   }
+}
+
+async function restoreSampleItems() {
+  const savedItems = await getAll("items");
+  const savedById = new Map(savedItems.map((item) => [item.id, item]));
+  const restoreTime = Date.now();
+  let addedCount = 0;
+  let restoredCount = 0;
+
+  for (const [index, sample] of SAMPLE_ITEMS.entries()) {
+    const existing = savedById.get(sample.id);
+    const updatedAt = new Date(restoreTime - index).toISOString();
+    await put("items", {
+      ...sample,
+      ...existing,
+      id: sample.id,
+      photo: existing?.photo || sample.photo,
+      status: "ready",
+      notes: existing?.notes || sample.notes || "KINARIのサンプルデータ",
+      isSample: true,
+      createdAt: existing?.createdAt || updatedAt,
+      updatedAt,
+      restoredAt: updatedAt,
+      lastWornAt: existing?.lastWornAt || null,
+    });
+    if (existing) restoredCount += 1;
+    else addedCount += 1;
+  }
+
+  items = await getAll("items");
+  $("#closet-search").value = "";
+  $("#category-filter").value = "all";
+  $("#status-filter").value = "ready";
+  renderAll();
+  switchView("closet");
+  const detail = addedCount && restoredCount
+    ? `（新規${addedCount}点・復元${restoredCount}点）`
+    : addedCount ? `（新規${addedCount}点）` : `（復元${restoredCount}点）`;
+  showToast(`サンプル30点を戻しました${detail}`);
 }
 
 async function loadTrendProfile() {
@@ -730,12 +769,14 @@ function bindEvents() {
     const edit = event.target.closest("[data-edit-item]");
     const archive = event.target.closest("[data-archive-item]");
     const restore = event.target.closest("[data-restore-item]");
+    const restoreSamples = event.target.closest("[data-restore-samples]");
     const rating = event.target.closest("[data-feedback]");
     const closeDialog = event.target.closest("[data-close-item-dialog]");
     if (opener) openItemDialog();
     if (edit) openItemDialog(items.find((item) => item.id === edit.dataset.editItem));
     if (archive) archiveItem(archive.dataset.archiveItem);
     if (restore) restoreItem(restore.dataset.restoreItem);
+    if (restoreSamples) restoreSampleItems();
     if (rating) saveFeedback(rating);
     if (closeDialog) $("#item-dialog").close();
   });
