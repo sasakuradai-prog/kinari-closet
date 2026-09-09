@@ -1,4 +1,4 @@
-/* 更新意図: 服の保存・提案・評価学習を提供し、スマホ向け登録処理を安定化。処理日時: 2026-09-05 JST */
+/* 更新意図: 服の保存・提案・評価学習に加え、各カテゴリ5点の画像付きサンプルを非破壊で初期投入。処理日時: 2026-09-09 JST */
 const DB_NAME = "kinari-closet";
 const DB_VERSION = 1;
 
@@ -12,6 +12,39 @@ const labels = {
 };
 
 const colorHex = { white: "#f6f5ef", black: "#282a28", gray: "#92958f", navy: "#263b55", blue: "#6585a3", beige: "#c8b797", brown: "#765846", green: "#647a61", red: "#a8534e", yellow: "#d3b34c", pink: "#c58f99", purple: "#7b6886", multi: "linear-gradient(90deg,#b38b67,#6e8290,#8a6b77)" };
+
+const SAMPLE_ITEMS = [
+  { id: "sample-tops-01", name: "白のオックスフォードシャツ", category: "tops", color: "white", season: "all", warmth: 2, formality: 4, photo: "assets/samples/tops-01.jpg" },
+  { id: "sample-tops-02", name: "ネイビーのクルーネックニット", category: "tops", color: "navy", season: "winter", warmth: 4, formality: 3, photo: "assets/samples/tops-02.jpg" },
+  { id: "sample-tops-03", name: "セージグリーンのTシャツ", category: "tops", color: "green", season: "summer", warmth: 1, formality: 1, photo: "assets/samples/tops-03.jpg" },
+  { id: "sample-tops-04", name: "ブルーのストライプシャツ", category: "tops", color: "blue", season: "all", warmth: 2, formality: 3, photo: "assets/samples/tops-04.jpg" },
+  { id: "sample-tops-05", name: "ベージュのスウェット", category: "tops", color: "beige", season: "autumn", warmth: 3, formality: 1, photo: "assets/samples/tops-05.jpg" },
+  { id: "sample-bottoms-01", name: "濃紺ストレートデニム", category: "bottoms", color: "navy", season: "all", warmth: 3, formality: 2, photo: "assets/samples/bottoms-01.jpg" },
+  { id: "sample-bottoms-02", name: "ベージュのチノパン", category: "bottoms", color: "beige", season: "all", warmth: 2, formality: 3, photo: "assets/samples/bottoms-02.jpg" },
+  { id: "sample-bottoms-03", name: "黒のテーパードパンツ", category: "bottoms", color: "black", season: "all", warmth: 2, formality: 4, photo: "assets/samples/bottoms-03.jpg" },
+  { id: "sample-bottoms-04", name: "オリーブのミディスカート", category: "bottoms", color: "green", season: "autumn", warmth: 2, formality: 3, photo: "assets/samples/bottoms-04.jpg" },
+  { id: "sample-bottoms-05", name: "ブルーのワイドデニム", category: "bottoms", color: "blue", season: "all", warmth: 3, formality: 1, photo: "assets/samples/bottoms-05.jpg" },
+  { id: "sample-onepiece-01", name: "クリームのシャツワンピース", category: "onepiece", color: "white", season: "spring", warmth: 2, formality: 3, photo: "assets/samples/onepiece-01.jpg" },
+  { id: "sample-onepiece-02", name: "ネイビーのミディワンピース", category: "onepiece", color: "navy", season: "all", warmth: 2, formality: 4, photo: "assets/samples/onepiece-02.jpg" },
+  { id: "sample-onepiece-03", name: "テラコッタのカジュアルワンピース", category: "onepiece", color: "red", season: "summer", warmth: 1, formality: 2, photo: "assets/samples/onepiece-03.jpg" },
+  { id: "sample-onepiece-04", name: "黒のフォーマルワンピース", category: "onepiece", color: "black", season: "all", warmth: 3, formality: 5, photo: "assets/samples/onepiece-04.jpg" },
+  { id: "sample-onepiece-05", name: "セージグリーンのリネンワンピース", category: "onepiece", color: "green", season: "summer", warmth: 1, formality: 2, photo: "assets/samples/onepiece-05.jpg" },
+  { id: "sample-outer-01", name: "ベージュのトレンチコート", category: "outer", color: "beige", season: "spring", warmth: 3, formality: 4, photo: "assets/samples/outer-01.jpg" },
+  { id: "sample-outer-02", name: "ブルーのデニムジャケット", category: "outer", color: "blue", season: "spring", warmth: 3, formality: 1, photo: "assets/samples/outer-02.jpg" },
+  { id: "sample-outer-03", name: "黒のテーラードジャケット", category: "outer", color: "black", season: "all", warmth: 3, formality: 5, photo: "assets/samples/outer-03.jpg" },
+  { id: "sample-outer-04", name: "オリーブのフィールドジャケット", category: "outer", color: "green", season: "autumn", warmth: 3, formality: 2, photo: "assets/samples/outer-04.jpg" },
+  { id: "sample-outer-05", name: "チャコールのウールコート", category: "outer", color: "gray", season: "winter", warmth: 5, formality: 4, photo: "assets/samples/outer-05.jpg" },
+  { id: "sample-shoes-01", name: "白のローカットスニーカー", category: "shoes", color: "white", season: "all", warmth: 2, formality: 1, photo: "assets/samples/shoes-01.jpg" },
+  { id: "sample-shoes-02", name: "黒のレザーローファー", category: "shoes", color: "black", season: "all", warmth: 2, formality: 4, photo: "assets/samples/shoes-02.jpg" },
+  { id: "sample-shoes-03", name: "ブラウンのアンクルブーツ", category: "shoes", color: "brown", season: "winter", warmth: 4, formality: 3, photo: "assets/samples/shoes-03.jpg" },
+  { id: "sample-shoes-04", name: "ベージュのフラットサンダル", category: "shoes", color: "beige", season: "summer", warmth: 1, formality: 2, photo: "assets/samples/shoes-04.jpg" },
+  { id: "sample-shoes-05", name: "ネイビーのランニングシューズ", category: "shoes", color: "navy", season: "all", warmth: 2, formality: 1, photo: "assets/samples/shoes-05.jpg", notes: "よく歩く日に向くサンプル" },
+  { id: "sample-accessory-01", name: "ブラウンのレザートート", category: "accessory", color: "brown", season: "all", warmth: 2, formality: 3, photo: "assets/samples/accessory-01.jpg" },
+  { id: "sample-accessory-02", name: "黒のショルダーバッグ", category: "accessory", color: "black", season: "all", warmth: 2, formality: 4, photo: "assets/samples/accessory-02.jpg" },
+  { id: "sample-accessory-03", name: "ベージュのキャップ", category: "accessory", color: "beige", season: "all", warmth: 1, formality: 1, photo: "assets/samples/accessory-03.jpg" },
+  { id: "sample-accessory-04", name: "ライトグレーのマフラー", category: "accessory", color: "gray", season: "winter", warmth: 5, formality: 3, photo: "assets/samples/accessory-04.jpg" },
+  { id: "sample-accessory-05", name: "ブラウンのレザーベルト", category: "accessory", color: "brown", season: "all", warmth: 2, formality: 3, photo: "assets/samples/accessory-05.jpg" },
+];
 
 let db;
 let items = [];
@@ -48,6 +81,26 @@ function storeRequest(store, mode, action, value) {
 const getAll = (store) => storeRequest(store, "readonly", "getAll");
 const put = (store, value) => storeRequest(store, "readwrite", "put", value);
 
+async function ensureSampleItems() {
+  const savedItems = await getAll("items");
+  const savedIds = new Set(savedItems.map((item) => item.id));
+  const seedTime = Date.now();
+
+  for (const [index, sample] of SAMPLE_ITEMS.entries()) {
+    if (savedIds.has(sample.id)) continue;
+    const createdAt = new Date(seedTime - index * 1000).toISOString();
+    await put("items", {
+      ...sample,
+      status: "ready",
+      notes: sample.notes || "KINARIのサンプルデータ",
+      isSample: true,
+      createdAt,
+      updatedAt: createdAt,
+      lastWornAt: null,
+    });
+  }
+}
+
 function createId() {
   if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
   return `${Date.now()}-${Math.random().toString(16).slice(2)}-${Math.random().toString(16).slice(2)}`;
@@ -61,9 +114,14 @@ function formatDate(date) {
   return new Intl.DateTimeFormat("ja-JP", { month: "long", day: "numeric", weekday: "long" }).format(date);
 }
 
-function objectURL(blob) {
-  if (!blob) return "";
-  return URL.createObjectURL(blob);
+function objectURL(photo) {
+  if (!photo) return "";
+  if (typeof photo === "string") return photo;
+  return URL.createObjectURL(photo);
+}
+
+function revokePhotoURL(url) {
+  if (url?.startsWith("blob:")) URL.revokeObjectURL(url);
 }
 
 function showToast(message) {
@@ -157,7 +215,7 @@ function resetItemForm() {
   $("#photo-preview").hidden = true;
   $("#photo-placeholder").hidden = false;
   $("#analysis-hint").textContent = "写真から色とファイル名を仮入力します。";
-  if (currentPhotoUrl) URL.revokeObjectURL(currentPhotoUrl);
+  revokePhotoURL(currentPhotoUrl);
   currentPhoto = null;
   currentPhotoUrl = null;
 }
@@ -276,7 +334,7 @@ function renderCloset() {
 
   $("#closet-grid").innerHTML = filtered.length ? filtered.map((item) => `
     <article class="closet-card">
-      <div class="card-image">${itemPhotoMarkup(item)}<span class="status-pill">${labels.status[item.status]}</span></div>
+      <div class="card-image">${itemPhotoMarkup(item)}<span class="status-pill">${labels.status[item.status]}</span>${item.isSample ? `<span class="sample-pill">サンプル</span>` : ""}</div>
       <div class="card-body">
         <h3>${escapeHTML(item.name)}</h3>
         <p class="card-meta"><span class="color-dot" style="background:${colorHex[item.color]}"></span>${labels.color[item.color]} ・ ${labels.category[item.category]} ・ ${labels.season[item.season]}</p>
@@ -459,7 +517,7 @@ function bindEvents() {
     try {
       const { blob, detectedColor } = await compressAndAnalyze(file);
       currentPhoto = blob;
-      if (currentPhotoUrl) URL.revokeObjectURL(currentPhotoUrl);
+      revokePhotoURL(currentPhotoUrl);
       currentPhotoUrl = objectURL(blob);
       $("#photo-preview").src = currentPhotoUrl;
       $("#photo-preview").hidden = false;
@@ -490,6 +548,7 @@ async function init() {
   $("#today-label").textContent = formatDate(new Date());
   try {
     db = await openDB();
+    await ensureSampleItems();
     [items, feedback] = await Promise.all([getAll("items"), getAll("feedback")]);
     bindEvents();
     renderAll();
