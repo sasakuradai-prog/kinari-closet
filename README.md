@@ -1,3 +1,7 @@
+> **このリポジトリは移転しました → https://github.com/kuraland/kinari-closet**
+> 公開サイト: https://kuraland.github.io/kinari-closet/ (旧URLは自動で転送されます)
+> このリポジトリはアーカイブ済みで、今後は更新されません。
+
 # KINARI — My Closet Stylist MVP
 
 > 追加意図: 手持ち服コーデ提案システムの初期実装、使い方、限界、拡張点を共有する。処理日時: 2026-09-04 09:34 JST
